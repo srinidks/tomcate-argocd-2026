@@ -1,14 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: tomcat-app
+  name: argocd-tomcate-app
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: https://github.com/srinidks/tomcate-argocd-2026.git
     targetRevision: main
-    path: k8s
+    path: manifest
   destination:
     server: https://kubernetes.default.svc
     namespace: tomcat
