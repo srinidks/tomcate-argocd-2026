@@ -1,7 +1,7 @@
 <html>
 <body>
 
-<h1 style="color:green;">Welcome to CI/CD Project</h1>
+<h1 style="color:green;">Welcome to Argo CI/CD Project</h1>
 
 
 <h3>The code updated on 01-JUN-2026</h3>

@@ -22,7 +22,7 @@
   </dependencies>
 
   <build>
-    <finalName>tomcat-app</finalName>
+    <finalName>argocd-tomcat-app</finalName>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
