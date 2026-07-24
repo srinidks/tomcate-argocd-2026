@@ -13,7 +13,7 @@ spec:
   template:
     metadata:
       labels:
-        app: tomcat-app
+        app: argocd-tomcat-app
     spec:
       containers:
         - name: tomcat-app
