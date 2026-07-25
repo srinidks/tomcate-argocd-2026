@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
         - name: tomcat-app
-          image: srinidks/argocd-tomcat-app:1
+          image: srinidks/argocd-tomcat-app:7
           ports:
             - containerPort: 8080
