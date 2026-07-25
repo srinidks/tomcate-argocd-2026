@@ -279,3 +279,313 @@ Verify
 ```bash
 trivy --version
 ```
+---
+
+# ☸️ Step 7: Install Kubernetes Cluster
+
+This project uses a Kubernetes cluster with:
+
+- 3 Control Plane Nodes
+- 2 Worker Nodes
+- Container Runtime: containerd
+- CNI Plugin: Calico
+- Kubernetes Version: v1.33.x
+
+Verify cluster status:
+
+```bash
+kubectl get nodes
+```
+
+Example output:
+
+```text
+NAME          STATUS   ROLES           AGE   VERSION
+k8s-master    Ready    control-plane   20d   v1.33.x
+k8s-master2   Ready    control-plane   20d   v1.33.x
+k8s-master3   Ready    control-plane   20d   v1.33.x
+k8s-worker1   Ready    <none>          20d   v1.33.x
+k8s-worker2   Ready    <none>          20d   v1.33.x
+```
+
+---
+
+# 📦 Step 8: Install Argo CD
+
+Create the Argo CD namespace.
+
+```bash
+kubectl create namespace argocd
+```
+
+Install Argo CD.
+
+```bash
+kubectl apply -n argocd \
+-f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Verify the pods.
+
+```bash
+kubectl get pods -n argocd
+```
+
+Expected output:
+
+```text
+NAME                                                READY   STATUS
+argocd-application-controller-xxxxx                 1/1     Running
+argocd-applicationset-controller-xxxxx              1/1     Running
+argocd-dex-server-xxxxx                             1/1     Running
+argocd-notifications-controller-xxxxx               1/1     Running
+argocd-redis-xxxxx                                  1/1     Running
+argocd-repo-server-xxxxx                            1/1     Running
+argocd-server-xxxxx                                 1/1     Running
+```
+
+---
+
+# 🌐 Step 9: Expose the Argo CD Server
+
+Change the service type to NodePort.
+
+```bash
+kubectl patch svc argocd-server \
+-n argocd \
+-p '{"spec":{"type":"NodePort"}}'
+```
+
+Verify the service.
+
+```bash
+kubectl get svc -n argocd
+```
+
+Example:
+
+```text
+NAME              TYPE       CLUSTER-IP      PORT(S)
+argocd-server     NodePort   10.96.10.10     80:30007/TCP,443:30008/TCP
+```
+
+Open the Argo CD UI.
+
+```
+https://NODE-IP:30008
+```
+
+---
+
+# 🔑 Step 10: Login to Argo CD
+
+Retrieve the initial admin password.
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+-o jsonpath="{.data.password}" | base64 -d
+
+echo
+```
+
+If the initial secret is unavailable (Argo CD v3.x), reset the password.
+
+Generate a bcrypt password hash.
+
+```bash
+argocd account bcrypt --password NewPassword@123
+```
+
+Update the Argo CD secret.
+
+```bash
+kubectl -n argocd patch secret argocd-secret \
+-p '{"stringData":{
+"admin.password":"<BCRYPT_HASH>",
+"admin.passwordMtime":"'$(date -u +%FT%TZ)'"
+}}'
+```
+
+Restart the Argo CD server.
+
+```bash
+kubectl rollout restart deployment argocd-server -n argocd
+```
+
+Login with:
+
+```
+Username: admin
+Password: NewPassword@123
+```
+
+---
+
+# 📁 Step 11: Create Kubernetes Namespace
+
+```bash
+kubectl create namespace tomcat
+```
+
+Verify:
+
+```bash
+kubectl get ns
+```
+
+---
+
+# 📄 Step 12: Create Deployment Manifest
+
+File:
+
+```
+kubernetes/deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: argocd-tomcat-app
+  namespace: tomcat
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: argocd-tomcat-app
+
+  template:
+    metadata:
+      labels:
+        app: argocd-tomcat-app
+
+    spec:
+      containers:
+      - name: tomcat
+        image: srinidks/argocd-tomcat-app:latest
+
+        ports:
+        - containerPort: 8080
+
+        imagePullPolicy: Always
+```
+
+---
+
+# 🌐 Step 13: Create Service Manifest
+
+File:
+
+```
+kubernetes/service.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: tomcat-app-svc
+  namespace: tomcat
+
+spec:
+  type: NodePort
+
+  selector:
+    app: argocd-tomcat-app
+
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30080
+```
+
+Apply the manifests.
+
+```bash
+kubectl apply -f kubernetes/deployment.yaml
+
+kubectl apply -f kubernetes/service.yaml
+```
+
+Verify the deployment.
+
+```bash
+kubectl get all -n tomcat
+```
+
+---
+
+# 🔗 Step 14: Create Argo CD Application
+
+You can create the application using the Argo CD UI or the CLI.
+
+Using the CLI:
+
+```bash
+argocd app create argocd-tomcat-app \
+--repo https://github.com/<your-github-username>/<your-manifest-repo>.git \
+--path kubernetes \
+--dest-server https://kubernetes.default.svc \
+--dest-namespace tomcat
+```
+
+Sync the application.
+
+```bash
+argocd app sync argocd-tomcat-app
+```
+
+Verify the application status.
+
+```bash
+argocd app get argocd-tomcat-app
+```
+
+The application should show:
+
+```text
+Sync Status : Synced
+Health      : Healthy
+```
+
+---
+
+# ✅ Step 15: Verify the Deployment
+
+Check the pods.
+
+```bash
+kubectl get pods -n tomcat
+```
+
+Check the service.
+
+```bash
+kubectl get svc -n tomcat
+```
+
+Check the endpoints.
+
+```bash
+kubectl get endpoints -n tomcat
+```
+
+Expected output:
+
+```text
+NAME             ENDPOINTS
+tomcat-app-svc   10.244.x.x:8080,10.244.x.x:8080
+```
+
+Access the application.
+
+```
+http://NODE-IP:30080/argocd-tomcat-app/
+```
+
+If using HTTPS ingress instead of a NodePort, use your ingress URL instead.
